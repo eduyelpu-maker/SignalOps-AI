@@ -273,7 +273,8 @@ async def get_incidents_data() -> Dict[str, Any]:
 
         if raw_records:
             incidents = [_normalize_record(r, i) for i, r in enumerate(raw_records)]
-            incidents.sort(key=lambda x: x["customer_priority_score"], reverse=True)
+            # Sort by timestamp descending (latest first) - matches Google Sheet row order
+            incidents.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
             _cache["data"] = incidents
             _cache["fetched_at"] = now
             _cache["source"] = "live"
