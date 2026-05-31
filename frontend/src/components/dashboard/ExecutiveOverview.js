@@ -1,29 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, AlertCircle, DollarSign, Clock, Users } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, DollarSign, Clock, Users, AlertTriangle, FileText } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 function ExecutiveOverview() {
   const [metrics, setMetrics] = useState(null);
+  const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchMetrics();
-    const interval = setInterval(fetchMetrics, 60000); // Refresh every 60s
+    fetchAll();
+    const interval = setInterval(fetchAll, 60000); // Refresh every 60s
     return () => clearInterval(interval);
   }, []);
 
-  const fetchMetrics = async () => {
+  const fetchAll = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/metrics`, {
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setMetrics(data);
-      }
+      const [metricsRes, incidentsRes] = await Promise.all([
+        fetch(`${API_URL}/api/metrics`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/incidents`, { credentials: 'include' })
+      ]);
+      if (metricsRes.ok) setMetrics(await metricsRes.json());
+      if (incidentsRes.ok) setIncidents(await incidentsRes.json());
     } catch (error) {
-      console.error('Failed to fetch metrics:', error);
+      console.error('Failed to fetch overview data:', error);
     } finally {
       setLoading(false);
     }
@@ -160,6 +160,95 @@ function ExecutiveOverview() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Executive Briefing Section */}
+      <BriefingSection incidents={incidents} />
+    </div>
+  );
+}
+
+function BriefingSection({ incidents }) {
+  if (!incidents || incidents.length === 0) return null;
+
+  const fintechIncidents = incidents.filter(i => i.industry === 'Fintech').length;
+  const platinumCustomers = incidents.filter(i => i.customer_tier === 'Platinum' && i.sla_risk > 70).length;
+  const totalRevenue = incidents
+    .filter(i => i.severity === 'Critical' || i.severity === 'High')
+    .reduce((sum, i) => sum + (i.revenue_at_risk || 0), 0);
+  const healthcareCritical = incidents.filter(i => i.industry === 'Healthcare' && i.severity === 'Critical').length;
+
+  const briefings = [
+    {
+      icon: TrendingUp,
+      color: 'text-amber-500',
+      bg: 'bg-amber-500/10',
+      title: 'Industry Trend Alert',
+      message: `Fintech incidents account for ${incidents.length > 0 ? ((fintechIncidents / incidents.length) * 100).toFixed(0) : 0}% of total escalations. Payment gateway issues are primary driver.`,
+      severity: 'Medium'
+    },
+    {
+      icon: AlertTriangle,
+      color: 'text-red-500',
+      bg: 'bg-red-500/10',
+      title: 'SLA Breach Warning',
+      message: `${platinumCustomers} platinum customer${platinumCustomers !== 1 ? 's are' : ' is'} approaching SLA breach threshold. Immediate executive attention required.`,
+      severity: 'Critical'
+    },
+    {
+      icon: DollarSign,
+      color: 'text-blue-600',
+      bg: 'bg-blue-600/10',
+      title: 'Revenue Impact Analysis',
+      message: `Revenue exposure estimated at $${(totalRevenue / 1000000).toFixed(1)}M across high-severity incidents. Customer retention at risk.`,
+      severity: 'High'
+    },
+    {
+      icon: Users,
+      color: 'text-purple-500',
+      bg: 'bg-purple-500/10',
+      title: 'Customer Escalation Pattern',
+      message: `Healthcare sector showing ${healthcareCritical} critical escalation${healthcareCritical !== 1 ? 's' : ''}. Database performance is common thread.`,
+      severity: 'High'
+    },
+  ];
+
+  return (
+    <div data-testid="overview-briefing" className="space-y-6">
+      <div className="flex items-center gap-3">
+        <FileText className="w-5 h-5 text-blue-600" />
+        <h2 className="text-xl font-outfit font-medium text-slate-50">Executive Briefing</h2>
+        <span className="text-xs font-semibold tracking-[0.2em] uppercase text-slate-500">
+          AI-Generated Insights
+        </span>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {briefings.map((brief, idx) => {
+          const Icon = brief.icon;
+          return (
+            <div key={idx} className="bg-slate-900 border border-slate-800 rounded-md p-6 hover-lift">
+              <div className="flex items-start gap-4">
+                <div className={`${brief.bg} p-3 rounded-md flex-shrink-0`}>
+                  <Icon className={`w-6 h-6 ${brief.color}`} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-base font-outfit font-medium text-slate-50">{brief.title}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      brief.severity === 'Critical' ? 'bg-red-500/10 text-red-500' :
+                      brief.severity === 'High' ? 'bg-amber-500/10 text-amber-500' :
+                      'bg-blue-500/10 text-blue-500'
+                    }`}>
+                      {brief.severity}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-400 leading-relaxed">{brief.message}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
