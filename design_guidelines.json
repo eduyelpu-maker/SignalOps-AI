@@ -1,0 +1,128 @@
+{
+  "project_name": "SignalOps AI",
+  "theme": "dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) - Dark Mode Adaptation",
+  "mood": "Authoritative, Secure, Intelligent, Operational",
+  "colors": {
+    "background": {
+      "default": "#020617",
+      "description": "Deep slate/obsidian (slate-950) for maximum contrast and low eye-strain during operations."
+    },
+    "surface": {
+      "solid": "#0f172a",
+      "glass": "rgba(2, 6, 23, 0.65)",
+      "border": "#1e293b",
+      "hover": "#1e293b",
+      "description": "slate-900 for solid cards. Glass surfaces MUST use backdrop-blur-xl and a 1px border of slate-800."
+    },
+    "primary": {
+      "default": "#2563eb",
+      "hover": "#1d4ed8",
+      "text_on_primary": "#ffffff",
+      "description": "Signal Blue. Used strictly for primary actions, active states, and AI highlights. No purple or teal gradients."
+    },
+    "text": {
+      "primary": "#f8fafc",
+      "secondary": "#94a3b8",
+      "muted": "#64748b",
+      "description": "slate-50 for primary headings/values, slate-400 for secondary text to maintain clear visual hierarchy."
+    },
+    "semantic": {
+      "error": "#ef4444",
+      "warning": "#f59e0b",
+      "success": "#10b981",
+      "info": "#3b82f6",
+      "description": "Crucial for command center triage. Use standard red/amber/green/blue with high saturation to pop against dark backgrounds."
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Outfit, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-semibold",
+      "h2": "text-2xl sm:text-3xl font-medium tracking-tight",
+      "h3": "text-xl sm:text-2xl font-medium",
+      "h4": "text-lg font-medium",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "overline": "text-xs font-semibold tracking-[0.2em] uppercase text-slate-400",
+      "data_value": "text-3xl sm:text-4xl font-light tracking-tight text-slate-50"
+    },
+    "rules": [
+      "Headings strictly use Outfit. Never use Inter for Headings.",
+      "Data metrics should use the 'data_value' scale for high visibility.",
+      "Keep line-height loose on body, tight on headings."
+    ]
+  },
+  "spacing_and_layout": {
+    "philosophy": "Grid Borders & Density (Mode B: The Control Room Grid)",
+    "rules": [
+      "Use tight gaps (gap-4 or gap-6) for dashboard grids.",
+      "Grid lines should be exposed in analytics sections (border-collapse style).",
+      "Apply p-6 or p-8 to cards, keeping breathing room despite data density.",
+      "Use 1px borders (border-slate-800) for all cards instead of heavy drop shadows."
+    ],
+    "patterns": {
+      "glassmorphism": "Used for sticky headers, floating navs, and the Incident Detail Drawer overlay. (bg-slate-950/65 backdrop-blur-xl border-b border-slate-800)",
+      "bento_grid": "Used for the Executive Overview and Analytics page. Mix span-1 summaries with span-2/3 chart panels."
+    }
+  },
+  "components": {
+    "buttons": "Flat, sharp edges or max 6px radius (rounded-md). Primary is solid blue, secondary is transparent with slate border.",
+    "cards": "Cardless aesthetic using grid borders OR flat slate-900 cards with 1px border. No soft shadows.",
+    "charts": "Recharts. Use slate-800 for gridlines. Tooltips must have dark glassmorphism backgrounds. Use semantic colors for severity charts.",
+    "tables": "Dense. border-b on rows. Hover state should be extremely subtle (bg-slate-900/50). Clear status pills.",
+    "badges": "Status pills must use soft backgrounds (bg-red-500/10 text-red-500) for elegance, avoiding solid blocks of color."
+  },
+  "animations": {
+    "rules": [
+      "Micro-interactions only. No heavy bouncy animations.",
+      "Hover on interactive cards: -translate-y-[2px] with border color change (border-slate-600).",
+      "Drawer slide-in from right for Incident Details."
+    ]
+  },
+  "image_urls": [
+    {
+      "url": "https://static.prod-images.emergentagent.com/jobs/ab7b3950-8dac-4af2-aa8a-fbed9287f225/images/e564ade6ebe64675908f87bfdfca234be7c80286ea15599e3e41c7461cb5da53.png",
+      "category": "hero_background",
+      "description": "Abstract dark mode tech background with glowing structural lines. Use as a subtle background behind the landing page hero section."
+    },
+    {
+      "url": "https://static.prod-images.emergentagent.com/jobs/ab7b3950-8dac-4af2-aa8a-fbed9287f225/images/05a9ee552af7f661138bce19158677966c5d68d4fad2ec43541f303871f7382c.png",
+      "category": "dashboard_abstract",
+      "description": "Premium geometric grid with subtle blue accent. Good for AI Intelligence center empty states or header banners."
+    },
+    {
+      "url": "https://images.pexels.com/photos/15863044/pexels-photo-15863044.jpeg",
+      "category": "sponsor_logo",
+      "description": "OpenAI Logo. Use in the 'Powered By' or 'Trusted By' section on the landing page."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1661347998423-b15d37d6f61e",
+      "category": "sponsor_logo",
+      "description": "Samsung Logo. Use in the 'Trusted By' section on the landing page."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e",
+      "category": "user_avatar",
+      "description": "Executive portrait 1. Use for Customer Profile or Logged-in Executive User Avatar."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1560250097-0b93528c311a",
+      "category": "user_avatar",
+      "description": "Executive portrait 2. Use in live activity feeds or assignees."
+    }
+  ],
+  "instructions_to_main_agent": [
+    "1. FRAMEWORK & LIBRARIES: Use React, Tailwind CSS, Recharts, and Shadcn UI. Install @phosphor-icons/react for enterprise-grade iconography.",
+    "2. DATA MOCKING: Create a robust mock data layer representing Google Sheets data (customer_name, industry, severity, sentiment, sla_risk, customer_priority_score, escalation_prediction, summary, recommended_action, timestamp).",
+    "3. STRUCTURE: Build a public landing page (/) and an authenticated dashboard area (/dashboard). Ensure a global responsive navigation sidebar for the command center.",
+    "4. DARK MODE: Force dark mode globally (`<html class='dark'>`). Follow the exact color tokens provided.",
+    "5. CHARTS: Implement Recharts for Analytics & Insights. Ensure chart axes, grids, and tooltips are styled for dark mode readability.",
+    "6. INTERACTIVITY: Build the Incident Detail Drawer as a side-panel sheet (Shadcn Sheet component).",
+    "7. TESTING ATTRIBUTES: MUST add `data-testid` attributes (kebab-case) to all buttons, links, inputs, and major layout sections.",
+    "8. POLISH: Use Lucide or Phosphor icons. Ensure tables are properly aligned (numbers right-aligned, text left). Overlays must use the specified glassmorphism pattern."
+  ]
+}
