@@ -217,6 +217,12 @@ def _extract_records(payload: Any) -> List[Dict[str, Any]]:
     if payload is None:
         return []
     if isinstance(payload, list):
+        # Unwrap n8n Aggregate wrapper: [{"data": [...records...]}]
+        if len(payload) == 1 and isinstance(payload[0], dict):
+            inner = payload[0]
+            for key in ("data", "records", "items", "incidents", "results", "rows"):
+                if key in inner and isinstance(inner[key], list):
+                    return [r for r in inner[key] if isinstance(r, dict)]
         return [r for r in payload if isinstance(r, dict)]
     if isinstance(payload, dict):
         # n8n acknowledgment responses - not real data
