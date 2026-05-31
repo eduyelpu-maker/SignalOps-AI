@@ -17,6 +17,13 @@ from google.oauth2.credentials import Credentials
 import warnings
 import requests as http_requests
 from mock_data import generate_mock_incidents, get_mock_metrics, get_analytics_data, get_activity_feed
+from n8n_service import (
+    get_incidents_data,
+    get_metrics_data,
+    get_analytics_payload,
+    get_activity_payload,
+    get_source_info,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -301,14 +308,15 @@ async def read_sheet(
     return result.get('values', [])
 
 
-# Data API Routes (with mock data)
+# Data API Routes (with live n8n + fallback to mock data)
 @api_router.get("/incidents")
 async def get_incidents(
     session_token: Optional[str] = Cookie(None),
     authorization: Optional[str] = Header(None)
 ):
     await get_user_from_session(session_token, authorization)
-    return generate_mock_incidents(50)
+    result = await get_incidents_data()
+    return result["incidents"]
 
 
 @api_router.get("/metrics")
@@ -317,7 +325,7 @@ async def get_metrics(
     authorization: Optional[str] = Header(None)
 ):
     await get_user_from_session(session_token, authorization)
-    return get_mock_metrics()
+    return await get_metrics_data()
 
 
 @api_router.get("/analytics")
@@ -326,7 +334,7 @@ async def get_analytics(
     authorization: Optional[str] = Header(None)
 ):
     await get_user_from_session(session_token, authorization)
-    return get_analytics_data()
+    return await get_analytics_payload()
 
 
 @api_router.get("/activity")
@@ -335,7 +343,17 @@ async def get_activity(
     authorization: Optional[str] = Header(None)
 ):
     await get_user_from_session(session_token, authorization)
-    return get_activity_feed()
+    return await get_activity_payload()
+
+
+@api_router.get("/data-source")
+async def get_data_source(
+    session_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None)
+):
+    """Return whether data is live (n8n) or demo (mock fallback)."""
+    await get_user_from_session(session_token, authorization)
+    return get_source_info()
 
 
 @api_router.get("/")

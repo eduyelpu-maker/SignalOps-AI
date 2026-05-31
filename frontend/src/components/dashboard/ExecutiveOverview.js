@@ -9,7 +9,7 @@ function ExecutiveOverview() {
 
   useEffect(() => {
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 30000); // Refresh every 30s
+    const interval = setInterval(fetchMetrics, 60000); // Refresh every 60s
     return () => clearInterval(interval);
   }, []);
 

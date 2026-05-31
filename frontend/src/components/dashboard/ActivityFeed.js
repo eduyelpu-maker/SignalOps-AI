@@ -9,7 +9,7 @@ function ActivityFeed() {
 
   useEffect(() => {
     fetchActivity();
-    const interval = setInterval(fetchActivity, 15000); // Refresh every 15s
+    const interval = setInterval(fetchActivity, 60000); // Refresh every 60s
     return () => clearInterval(interval);
   }, []);
 

@@ -16,7 +16,7 @@ function EscalationCenter() {
 
   useEffect(() => {
     fetchIncidents();
-    const interval = setInterval(fetchIncidents, 30000);
+    const interval = setInterval(fetchIncidents, 60000);
     return () => clearInterval(interval);
   }, []);
 

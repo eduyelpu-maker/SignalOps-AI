@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, AlertCircle, Brain, Users, TrendingUp, Activity, FileText, Menu, X, LogOut, Zap } from 'lucide-react';
+import { LayoutDashboard, AlertCircle, Brain, Users, TrendingUp, Activity, FileText, Menu, X, LogOut, Zap, Radio } from 'lucide-react';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import ExecutiveOverview from '../components/dashboard/ExecutiveOverview';
 import EscalationCenter from '../components/dashboard/EscalationCenter';
@@ -25,7 +25,25 @@ const navigation = [
 
 function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dataSource, setDataSource] = useState('demo');
   const location = useLocation();
+
+  useEffect(() => {
+    const fetchSource = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/data-source`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setDataSource(data.source);
+        }
+      } catch (err) {
+        // silent
+      }
+    };
+    fetchSource();
+    const interval = setInterval(fetchSource, 60000); // Match 60s refresh
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -129,6 +147,21 @@ function Dashboard() {
           {/* Main Content */}
           <main className="flex-1 lg:ml-64">
             <div className="p-6 lg:p-8">
+              {/* Data Source Indicator */}
+              <div className="flex justify-end mb-4">
+                <div 
+                  data-testid="data-source-badge"
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${
+                    dataSource === 'live'
+                      ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  }`}
+                >
+                  <Radio className={`w-3 h-3 ${dataSource === 'live' ? 'animate-pulse' : ''}`} />
+                  <span>{dataSource === 'live' ? 'Live Data (n8n)' : 'Demo Mode'}</span>
+                </div>
+              </div>
+
               <Routes>
                 <Route path="/" element={<ExecutiveOverview />} />
                 <Route path="/escalations" element={<EscalationCenter />} />
