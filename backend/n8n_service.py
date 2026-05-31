@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 N8N_WEBHOOK_URL = os.environ.get(
     'N8N_WEBHOOK_URL',
-    'https://edu-yelpu.app.n8n.cloud/webhook-test/Get-Dashboard-data'
+    'https://edu-yelpu.app.n8n.cloud/webhook/Get-Dashboard-data'
 )
 
 # Cache configuration (60-second TTL matches frontend refresh interval)
