@@ -124,46 +124,82 @@ function ExecutiveOverview() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-md p-6">
-          <h3 className="text-lg font-outfit font-medium text-slate-50 mb-4">Incident Velocity</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Last Hour</span>
-              <span className="text-slate-50 font-medium">12 incidents</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Last 24 Hours</span>
-              <span className="text-slate-50 font-medium">87 incidents</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">This Week</span>
-              <span className="text-slate-50 font-medium">412 incidents</span>
-            </div>
-          </div>
-        </div>
+      <QuickStats incidents={incidents} />
 
-        <div className="bg-slate-900 border border-slate-800 rounded-md p-6">
-          <h3 className="text-lg font-outfit font-medium text-slate-50 mb-4">Response Times</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Avg First Response</span>
-              <span className="text-slate-50 font-medium">8 minutes</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Avg Resolution</span>
-              <span className="text-slate-50 font-medium">2.4 hours</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">SLA Compliance</span>
-              <span className="text-green-500 font-medium">94.2%</span>
-            </div>
+      {/* Executive Briefing Section */}
+      <BriefingSection incidents={incidents} />
+    </div>
+  );
+}
+
+function QuickStats({ incidents }) {
+  const now = Date.now();
+  const HOUR = 60 * 60 * 1000;
+  const DAY = 24 * HOUR;
+  const WEEK = 7 * DAY;
+
+  const inWindow = (windowMs) => incidents.filter(i => {
+    try {
+      const t = new Date(i.timestamp).getTime();
+      return !isNaN(t) && (now - t) <= windowMs;
+    } catch { return false; }
+  }).length;
+
+  const lastHour = inWindow(HOUR);
+  const last24h = inWindow(DAY);
+  const thisWeek = inWindow(WEEK);
+
+  // SLA Compliance: % of incidents with sla_risk <= 70
+  const slaCompliant = incidents.filter(i => (i.sla_risk || 0) <= 70).length;
+  const slaCompliance = incidents.length > 0 ? ((slaCompliant / incidents.length) * 100).toFixed(1) : '0.0';
+
+  // Average priority/escalation as proxy for urgency
+  const avgPriority = incidents.length > 0
+    ? Math.round(incidents.reduce((s, i) => s + (i.customer_priority_score || 0), 0) / incidents.length)
+    : 0;
+  const avgEscalation = incidents.length > 0
+    ? Math.round(incidents.reduce((s, i) => s + (i.escalation_prediction || 0), 0) / incidents.length)
+    : 0;
+
+  return (
+    <div className="grid md:grid-cols-2 gap-6">
+      <div className="bg-slate-900 border border-slate-800 rounded-md p-6">
+        <h3 className="text-lg font-outfit font-medium text-slate-50 mb-4">Incident Velocity</h3>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-400">Last Hour</span>
+            <span className="text-slate-50 font-medium">{lastHour} incident{lastHour !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-400">Last 24 Hours</span>
+            <span className="text-slate-50 font-medium">{last24h} incident{last24h !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-400">This Week</span>
+            <span className="text-slate-50 font-medium">{thisWeek} incident{thisWeek !== 1 ? 's' : ''}</span>
           </div>
         </div>
       </div>
 
-      {/* Executive Briefing Section */}
-      <BriefingSection incidents={incidents} />
+      <div className="bg-slate-900 border border-slate-800 rounded-md p-6">
+        <h3 className="text-lg font-outfit font-medium text-slate-50 mb-4">Risk Indicators</h3>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-400">Avg Priority Score</span>
+            <span className="text-slate-50 font-medium">{avgPriority}/100</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-400">Avg Escalation Risk</span>
+            <span className="text-slate-50 font-medium">{avgEscalation}%</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-400">SLA Compliance</span>
+            <span className={`font-medium ${parseFloat(slaCompliance) >= 80 ? 'text-green-500' : parseFloat(slaCompliance) >= 60 ? 'text-amber-500' : 'text-red-500'}`}>
+              {slaCompliance}%
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
