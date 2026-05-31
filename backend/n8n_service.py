@@ -23,39 +23,61 @@ N8N_WEBHOOK_URL = os.environ.get(
 _cache: Dict[str, Any] = {
     "data": None,
     "fetched_at": None,
-    "source": "demo"  # "live" or "demo"
+    "source": "demo"
 }
 _CACHE_TTL_SECONDS = 60
 _lock = asyncio.Lock()
 
-# Customer tier inference based on revenue
-TIER_THRESHOLDS = [
-    (2000000, "Platinum"),
-    (1000000, "Gold"),
-    (0, "Silver")
-]
+# Convert string risk levels to numeric percentages
+RISK_LEVEL_MAP = {
+    "critical": 95,
+    "very high": 90,
+    "high": 80,
+    "medium": 50,
+    "moderate": 50,
+    "low": 25,
+    "very low": 10,
+    "minimal": 5,
+    "none": 0,
+}
 
-# Revenue inference by industry (fallback if not provided)
-INDUSTRY_REVENUE_DEFAULTS = {
-    "Fintech": 2400000,
-    "Healthcare": 1800000,
-    "SaaS": 1200000,
-    "Telecom": 3200000,
-    "Retail": 950000,
+# Revenue numeric mapping for string-based revenue_risk
+REVENUE_RISK_MAP = {
+    "critical": 5000000,
+    "very high": 3500000,
+    "high": 2500000,
+    "medium": 1200000,
+    "moderate": 1200000,
+    "low": 500000,
+    "very low": 200000,
+    "minimal": 100000,
+}
+
+INDUSTRY_KEYWORDS = {
+    "Healthcare": ["hospital", "health", "medical", "clinic", "medcore", "patient", "pharma"],
+    "Fintech": ["bank", "pay", "finance", "fintech", "capital", "invest", "credit", "trading"],
+    "Telecom": ["telecom", "telco", "mobile", "wireless", "communications", "network"],
+    "Retail": ["retail", "shop", "store", "mart", "commerce", "checkout"],
+    "SaaS": ["saas", "cloud", "soft", "tech", "platform", "data", "systems"],
 }
 
 
-def _infer_tier(revenue: float) -> str:
-    for threshold, tier in TIER_THRESHOLDS:
-        if revenue >= threshold:
-            return tier
-    return "Silver"
+def _infer_industry(customer_name: str, summary: str = "") -> str:
+    text = (customer_name + " " + summary).lower()
+    for industry, keywords in INDUSTRY_KEYWORDS.items():
+        if any(kw in text for kw in keywords):
+            return industry
+    return "SaaS"
 
 
 def _safe_int(value, default=0) -> int:
     try:
         if isinstance(value, str):
-            value = value.strip().rstrip('%')
+            v = value.strip().rstrip('%').lower()
+            # Check if it's a risk level word
+            if v in RISK_LEVEL_MAP:
+                return RISK_LEVEL_MAP[v]
+            return int(float(v))
         return int(float(value))
     except (TypeError, ValueError):
         return default
@@ -69,32 +91,86 @@ def _normalize_severity(value) -> str:
         return "Critical"
     if v in ("high", "p1", "sev1", "sev-1"):
         return "High"
-    if v in ("medium", "med", "p2", "sev2", "sev-2"):
+    if v in ("medium", "med", "p2", "sev2", "sev-2", "moderate"):
         return "Medium"
     if v in ("low", "p3", "p4", "sev3", "sev-3"):
         return "Low"
     return str(value).capitalize()
 
 
+def _normalize_sentiment(value) -> str:
+    if not value:
+        return "Neutral"
+    v = str(value).strip()
+    # Pass through n8n sentiments like "Executive Escalation", "Frustrated", etc.
+    return v
+
+
+def _resolve_revenue(record: Dict[str, Any], severity: str) -> int:
+    """Resolve revenue_at_risk from various field shapes."""
+    # Try numeric fields first
+    for key in ("revenue_at_risk", "revenue"):
+        if key in record and record[key] is not None:
+            try:
+                val = record[key]
+                if isinstance(val, (int, float)):
+                    return int(val)
+                if isinstance(val, str) and val.replace(",", "").replace(".", "").replace("$", "").isdigit():
+                    return int(float(val.replace(",", "").replace("$", "")))
+            except (ValueError, TypeError):
+                pass
+
+    # Try string-based revenue_risk
+    revenue_risk = record.get("revenue_risk")
+    if revenue_risk and isinstance(revenue_risk, str):
+        v = revenue_risk.strip().lower()
+        if v in REVENUE_RISK_MAP:
+            return REVENUE_RISK_MAP[v]
+
+    # Default by severity
+    severity_revenue = {
+        "Critical": 3500000,
+        "High": 1800000,
+        "Medium": 800000,
+        "Low": 200000,
+    }
+    return severity_revenue.get(severity, 1000000)
+
+
+def _resolve_tier(revenue: int, record: Dict[str, Any]) -> str:
+    if record.get("customer_tier"):
+        return record["customer_tier"]
+    if revenue >= 2500000:
+        return "Platinum"
+    if revenue >= 1000000:
+        return "Gold"
+    return "Silver"
+
+
 def _normalize_record(record: Dict[str, Any], idx: int) -> Dict[str, Any]:
-    """Normalize a raw record into the incident shape used by the dashboard."""
-    industry = record.get("industry") or "SaaS"
+    """Normalize a raw n8n record into the incident shape used by the dashboard."""
     customer_name = record.get("customer_name") or f"Customer {idx + 1}"
+    summary = record.get("summary") or "Customer escalation requiring attention."
     severity = _normalize_severity(record.get("severity"))
 
+    industry = record.get("industry") or _infer_industry(customer_name, summary)
+
+    # Numeric fields (handle both numeric and string values)
     sla_risk = _safe_int(record.get("sla_risk"), 50)
-    priority_score = _safe_int(record.get("customer_priority_score"), 50)
-    escalation_pred = _safe_int(record.get("escalation_prediction"), 50)
+    # Support both priority_score and customer_priority_score
+    priority_score = _safe_int(
+        record.get("customer_priority_score") or record.get("priority_score"),
+        50
+    )
+    escalation_pred = _safe_int(
+        record.get("escalation_prediction") or record.get("escalation_probability"),
+        # Derive from priority score if missing
+        min(100, priority_score + 5) if severity in ("Critical", "High") else max(20, priority_score - 20)
+    )
 
-    # Infer revenue and tier
-    revenue = record.get("revenue_at_risk")
-    if revenue is None:
-        revenue = INDUSTRY_REVENUE_DEFAULTS.get(industry, 1000000)
-    revenue = _safe_int(revenue, 1000000)
+    revenue = _resolve_revenue(record, severity)
+    tier = _resolve_tier(revenue, record)
 
-    tier = record.get("customer_tier") or _infer_tier(revenue)
-
-    # Status inference
     status = record.get("status")
     if not status:
         if severity == "Critical":
@@ -104,17 +180,19 @@ def _normalize_record(record: Dict[str, Any], idx: int) -> Dict[str, Any]:
         else:
             status = "Open"
 
-    # Sentiment normalization
-    sentiment = record.get("sentiment") or "Neutral"
-    if severity == "Critical" and sentiment == "Neutral":
-        sentiment = "Frustrated"
+    sentiment = _normalize_sentiment(record.get("sentiment"))
 
     timestamp = record.get("timestamp")
     if not timestamp:
         timestamp = datetime.now(timezone.utc).isoformat()
 
+    incident_id = record.get("incident_id")
+    if not incident_id:
+        row_num = record.get("row_number") or (idx + 1)
+        incident_id = f"INC-{1000 + int(row_num)}"
+
     return {
-        "incident_id": record.get("incident_id") or f"INC-{1000 + idx}",
+        "incident_id": incident_id,
         "customer_name": customer_name,
         "industry": industry,
         "customer_tier": tier,
@@ -124,7 +202,7 @@ def _normalize_record(record: Dict[str, Any], idx: int) -> Dict[str, Any]:
         "sla_risk": sla_risk,
         "customer_priority_score": priority_score,
         "escalation_prediction": escalation_pred,
-        "summary": record.get("summary") or "Customer escalation requiring attention.",
+        "summary": summary,
         "recommended_action": record.get("recommended_action") or "Review with support team and assign owner.",
         "timestamp": timestamp,
         "status": status,
@@ -141,11 +219,15 @@ def _extract_records(payload: Any) -> List[Dict[str, Any]]:
     if isinstance(payload, list):
         return [r for r in payload if isinstance(r, dict)]
     if isinstance(payload, dict):
+        # n8n acknowledgment responses - not real data
+        if set(payload.keys()) <= {"message", "code"}:
+            return []
+        # Common n8n wrapper keys
         for key in ("data", "records", "items", "incidents", "results", "rows"):
             if key in payload and isinstance(payload[key], list):
                 return [r for r in payload[key] if isinstance(r, dict)]
-        # Single record
-        if any(k in payload for k in ("customer_name", "severity", "summary")):
+        # Single record - wrap in list
+        if any(k in payload for k in ("customer_name", "severity", "summary", "row_number")):
             return [payload]
     return []
 
@@ -153,17 +235,15 @@ def _extract_records(payload: Any) -> List[Dict[str, Any]]:
 async def _fetch_from_n8n() -> Optional[List[Dict[str, Any]]]:
     """Fetch raw data from n8n webhook. Returns None on failure."""
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(N8N_WEBHOOK_URL)
             if response.status_code != 200:
-                logger.warning(
-                    f"n8n webhook returned {response.status_code}: {response.text[:200]}"
-                )
+                logger.warning(f"n8n webhook returned {response.status_code}: {response.text[:200]}")
                 return None
             payload = response.json()
             records = _extract_records(payload)
             if not records:
-                logger.warning(f"n8n webhook returned no usable records: {str(payload)[:200]}")
+                logger.warning(f"n8n webhook returned no usable records: {str(payload)[:300]}")
                 return None
             logger.info(f"Fetched {len(records)} records from n8n")
             return records
@@ -176,7 +256,6 @@ async def get_incidents_data() -> Dict[str, Any]:
     """Get incidents data with caching and fallback. Returns {incidents, source}."""
     async with _lock:
         now = datetime.now(timezone.utc)
-        # Use cache if still valid
         if (
             _cache["data"] is not None
             and _cache["fetched_at"] is not None
@@ -184,7 +263,6 @@ async def get_incidents_data() -> Dict[str, Any]:
         ):
             return {"incidents": _cache["data"], "source": _cache["source"]}
 
-        # Try live fetch
         raw_records = await _fetch_from_n8n()
 
         if raw_records:
@@ -210,12 +288,10 @@ async def get_metrics_data() -> Dict[str, Any]:
     source = result["source"]
 
     if source == "demo":
-        # Use existing mock metrics shape for consistency
         metrics = get_mock_metrics()
         metrics["source"] = "demo"
         return metrics
 
-    # Derive metrics from live incidents
     critical = sum(1 for i in incidents if i["severity"] == "Critical")
     active = sum(1 for i in incidents if i["status"] in ("Open", "In Progress", "Escalated"))
     revenue_risk = sum(
@@ -250,7 +326,6 @@ async def get_analytics_payload() -> Dict[str, Any]:
         data["source"] = "demo"
         return data
 
-    # Severity distribution
     severity_colors = {
         "Critical": "#ef4444",
         "High": "#f59e0b",
@@ -263,13 +338,11 @@ async def get_analytics_payload() -> Dict[str, Any]:
         for name, count in sev_counter.most_common()
     ]
 
-    # Industry breakdown
     industry_counter = Counter(i["industry"] for i in incidents)
     industry_breakdown = [
         {"industry": name, "count": count} for name, count in industry_counter.most_common()
     ]
 
-    # Incident trends (group by day of week from timestamps)
     day_buckets: Dict[str, Dict[str, int]] = {}
     day_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     for d in day_order:
@@ -311,7 +384,6 @@ async def get_activity_payload() -> List[Dict[str, Any]]:
     if source == "demo":
         return get_activity_feed()
 
-    # Build activity feed from most recent incidents
     sorted_incidents = sorted(
         incidents,
         key=lambda x: x.get("timestamp", ""),
@@ -358,4 +430,5 @@ def get_source_info() -> Dict[str, Any]:
         "source": _cache.get("source", "demo"),
         "fetched_at": _cache["fetched_at"].isoformat() if _cache.get("fetched_at") else None,
         "endpoint": N8N_WEBHOOK_URL,
+        "record_count": len(_cache["data"]) if _cache.get("data") else 0,
     }
